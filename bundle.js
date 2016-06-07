@@ -70,6 +70,115 @@
 
 	function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
+	var correl = function correl(n, x, y) {
+	  var xbar = 0;
+	  var ybar = 0;
+	  for (var i = 0; i < n; ++i) {
+	    xbar += x[i];
+	    ybar += y[i];
+	  }
+	  xbar /= n;
+	  ybar /= n;
+	  var xx = 0;
+	  var xy = 0;
+	  var yy = 0;
+	  for (var _i = 0; _i < n; ++_i) {
+	    xx += (x[_i] - xbar) * (x[_i] - xbar);
+	    xy += (x[_i] - xbar) * (y[_i] - ybar);
+	    yy += (y[_i] - ybar) * (y[_i] - ybar);
+	  }
+	  return xy / Math.sqrt(xx * yy);
+	};
+
+	var norm = function norm(n, x, y) {
+	  var sum = 0;
+	  for (var i = 0; i < n; ++i) {
+	    var diff = x[i] - y[i];
+	    sum += diff * diff;
+	  }
+	  return Math.sqrt(sum);
+	};
+
+	var weight = function weight(E, xi, i, library) {
+	  var values = library.map(function (xj, j) {
+	    return { norm: norm(E, xi, xj), index: j };
+	  }).filter(function (_, j) {
+	    return i !== j;
+	  });
+	  values.sort(function (v1, v2) {
+	    return v1.norm - v2.norm;
+	  });
+	  var w = [];
+	  for (var j = 0; j < E + 1; ++j) {
+	    w.push(values[j]);
+	  }
+	  var sumw = 0;
+	  w.forEach(function (_, j) {
+	    w[j].weight = Math.exp(-w[j].norm / w[0].norm);
+	    sumw += w[j].weight;
+	  });
+	  w.forEach(function (_, j) {
+	    w[j].weight /= sumw;
+	  });
+	  return w;
+	};
+
+	var ccm = function ccm(n, X, Y, E, tau, lMin) {
+	  var XE = [];
+	  for (var i = (E - 1) * tau; i < n; ++i) {
+	    var x = [];
+	    for (var j = 0; j < E; ++j) {
+	      x.push(X[i - tau * j]);
+	    }
+	    XE.push(x);
+	  }
+	  var rho = [];
+	  var Yexact = Y.slice(n - XE.length);
+
+	  var _loop = function _loop(l) {
+	    var library = XE.slice(0, l);
+	    var Yest = [];
+	    XE.forEach(function (x, i) {
+	      var w = weight(E, x, i, library);
+	      var Yesti = 0;
+	      var _iteratorNormalCompletion = true;
+	      var _didIteratorError = false;
+	      var _iteratorError = undefined;
+
+	      try {
+	        for (var _iterator = w[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+	          var _step$value = _step.value;
+	          var _weight = _step$value.weight;
+	          var index = _step$value.index;
+
+	          Yesti += _weight * Y[index];
+	        }
+	      } catch (err) {
+	        _didIteratorError = true;
+	        _iteratorError = err;
+	      } finally {
+	        try {
+	          if (!_iteratorNormalCompletion && _iterator.return) {
+	            _iterator.return();
+	          }
+	        } finally {
+	          if (_didIteratorError) {
+	            throw _iteratorError;
+	          }
+	        }
+	      }
+
+	      Yest.push(Yesti);
+	    });
+	    rho.push(correl(XE.length, Yexact, Yest));
+	  };
+
+	  for (var l = lMin; l < XE.length; ++l) {
+	    _loop(l);
+	  }
+	  return rho;
+	};
+
 	var OrbitControls = __webpack_require__(170)(_three2.default);
 	var screenSize = 600;
 
@@ -86,22 +195,18 @@
 	    key: 'componentDidMount',
 	    value: function componentDidMount() {
 	      var _props = this.props;
+	      var E = _props.E;
 	      var tau = _props.tau;
 	      var data = _props.data;
 	      var camera = _props.camera;
 
 
-	      var xScene = new _three2.default.Scene();
-	      var yScene = new _three2.default.Scene();
+	      var scene = new _three2.default.Scene();
 	      camera.position.z = 1;
 
-	      var xRenderer = new _three2.default.WebGLRenderer();
-	      xRenderer.setSize(screenSize, screenSize);
-	      this.refs.xWrapper.appendChild(xRenderer.domElement);
-
-	      var yRenderer = new _three2.default.WebGLRenderer();
-	      yRenderer.setSize(screenSize, screenSize);
-	      this.refs.yWrapper.appendChild(yRenderer.domElement);
+	      var renderer = new _three2.default.WebGLRenderer();
+	      renderer.setSize(screenSize, screenSize);
+	      this.refs.wrapper.appendChild(renderer.domElement);
 
 	      var xScale = _d2.default.scale.linear().domain(_d2.default.extent(data, function (d) {
 	        return +d.X;
@@ -112,21 +217,18 @@
 	      var xGeometry = new _three2.default.Geometry();
 	      var yGeometry = new _three2.default.Geometry();
 	      for (var i = tau * 2; i < data.length; ++i) {
-	        xGeometry.vertices.push(new _three2.default.Vector3(xScale(data[i].X), xScale(data[i - tau].X), xScale(data[i - 2 * tau].X)));
-	        yGeometry.vertices.push(new _three2.default.Vector3(yScale(data[i].Y), yScale(data[i - tau].Y), yScale(data[i - 2 * tau].Y)));
+	        xGeometry.vertices.push(new _three2.default.Vector3(xScale(data[i].X), xScale(data[i - tau].X), E === 2 ? 0 : xScale(data[i - 2 * tau].X)));
+	        yGeometry.vertices.push(new _three2.default.Vector3(yScale(data[i].Y), yScale(data[i - tau].Y), E === 2 ? 0 : yScale(data[i - 2 * tau].Y)));
 	      }
-	      xScene.add(new _three2.default.Line(xGeometry, new _three2.default.LineBasicMaterial({ color: new _three2.default.Color(0xff0000) })));
-	      yScene.add(new _three2.default.Line(yGeometry, new _three2.default.LineBasicMaterial({ color: new _three2.default.Color(0x0000ff) })));
+	      scene.add(new _three2.default.Line(xGeometry, new _three2.default.LineBasicMaterial({ color: new _three2.default.Color(0xff0000) })));
+	      scene.add(new _three2.default.Line(yGeometry, new _three2.default.LineBasicMaterial({ color: new _three2.default.Color(0x0000ff) })));
 
-	      var xControls = new OrbitControls(camera, xRenderer.domElement);
-	      var yControls = new OrbitControls(camera, yRenderer.domElement);
+	      var controls = new OrbitControls(camera, renderer.domElement);
 
 	      var render = function render() {
 	        window.requestAnimationFrame(render);
-	        xControls.update();
-	        yControls.update();
-	        xRenderer.render(xScene, camera);
-	        yRenderer.render(yScene, camera);
+	        controls.update();
+	        renderer.render(scene, camera);
 	      };
 
 	      render();
@@ -147,9 +249,8 @@
 	        ),
 	        _react2.default.createElement(
 	          'div',
-	          { style: { display: 'flex' } },
-	          _react2.default.createElement('div', { style: { margin: '0 10px' }, ref: 'xWrapper' }),
-	          _react2.default.createElement('div', { style: { margin: '0 10px' }, ref: 'yWrapper' })
+	          null,
+	          _react2.default.createElement('div', { ref: 'wrapper' })
 	        )
 	      );
 	    }
@@ -158,8 +259,122 @@
 	  return Screen;
 	}(_react2.default.Component);
 
-	var App = function (_React$Component2) {
-	  _inherits(App, _React$Component2);
+	var Chart = function (_React$Component2) {
+	  _inherits(Chart, _React$Component2);
+
+	  function Chart() {
+	    _classCallCheck(this, Chart);
+
+	    return _possibleConstructorReturn(this, Object.getPrototypeOf(Chart).apply(this, arguments));
+	  }
+
+	  _createClass(Chart, [{
+	    key: 'render',
+	    value: function render() {
+	      var _props2 = this.props;
+	      var data = _props2.data;
+	      var E = _props2.E;
+	      var tau = _props2.tau;
+
+	      var rhoX = ccm(data.length, data.map(function (d) {
+	        return +d.X;
+	      }), data.map(function (d) {
+	        return +d.Y;
+	      }), E, tau, 10);
+	      var rhoY = ccm(data.length, data.map(function (d) {
+	        return +d.Y;
+	      }), data.map(function (d) {
+	        return +d.X;
+	      }), E, tau, 10);
+	      var svgSize = 500;
+	      var xScale = _d2.default.scale.linear().domain([0, rhoX.length - 1]).range([0, svgSize]);
+	      var yScale = _d2.default.scale.linear().domain([-1, 1]).range([svgSize, 0]);
+	      var line = _d2.default.svg.line().x(function (_, i) {
+	        return xScale(i);
+	      }).y(function (d) {
+	        return yScale(d);
+	      });
+	      return _react2.default.createElement(
+	        'div',
+	        null,
+	        _react2.default.createElement(
+	          'p',
+	          null,
+	          'tau = ',
+	          tau
+	        ),
+	        _react2.default.createElement(
+	          'div',
+	          null,
+	          _react2.default.createElement(
+	            'svg',
+	            { width: screenSize, height: screenSize, style: { backgroundColor: '#000' } },
+	            _react2.default.createElement(
+	              'g',
+	              { transform: 'translate(50,50)' },
+	              _react2.default.createElement('path', { d: line(rhoX), fill: 'none', stroke: '#ff0000' }),
+	              _react2.default.createElement('path', { d: line(rhoY), fill: 'none', stroke: '#0000ff' })
+	            ),
+	            _react2.default.createElement(
+	              'g',
+	              { transform: 'translate(50,300)' },
+	              _react2.default.createElement('line', { x1: '0', y1: '0', x2: svgSize, y2: '0', stroke: '#fff' })
+	            ),
+	            _react2.default.createElement(
+	              'g',
+	              { transform: 'translate(50,50)' },
+	              _react2.default.createElement('line', { x1: '0', y1: '0', x2: '0', y2: svgSize, stroke: '#fff' }),
+	              _react2.default.createElement(
+	                'text',
+	                { x: '-10', y: '0', fill: '#fff', textAnchor: 'end' },
+	                '1.0'
+	              ),
+	              _react2.default.createElement(
+	                'text',
+	                { x: '-10', y: svgSize * 1 / 4, fill: '#fff', textAnchor: 'end' },
+	                '0.5'
+	              ),
+	              _react2.default.createElement(
+	                'text',
+	                { x: '-10', y: svgSize / 2, fill: '#fff', textAnchor: 'end' },
+	                '0.0'
+	              ),
+	              _react2.default.createElement(
+	                'text',
+	                { x: '-10', y: svgSize * 3 / 4, fill: '#fff', textAnchor: 'end' },
+	                '-0.5'
+	              ),
+	              _react2.default.createElement(
+	                'text',
+	                { x: '-10', y: svgSize, fill: '#fff', textAnchor: 'end' },
+	                '-1.0'
+	              )
+	            ),
+	            _react2.default.createElement(
+	              'g',
+	              { transform: 'translate(60,20)' },
+	              _react2.default.createElement(
+	                'text',
+	                { y: '0', fill: '#ff0000' },
+	                'M_X -> Y'
+	              ),
+	              _react2.default.createElement(
+	                'text',
+	                { y: '20', fill: '#0000ff' },
+	                'M_Y -> X'
+	              )
+	            )
+	          )
+	        )
+	      );
+	    }
+	  }]);
+
+	  return Chart;
+	}(_react2.default.Component);
+
+	var App = function (_React$Component3) {
+	  _inherits(App, _React$Component3);
 
 	  function App() {
 	    _classCallCheck(this, App);
@@ -185,20 +400,91 @@
 	            null,
 	            'n = ',
 	            data.length
-	          ),
-	          _react2.default.createElement(
-	            'p',
-	            null,
-	            'E = 3'
 	          )
 	        ),
 	        _react2.default.createElement(
 	          'div',
-	          null,
-	          _react2.default.createElement(Screen, { tau: 1, data: data, camera: camera }),
-	          _react2.default.createElement(Screen, { tau: 2, data: data, camera: camera }),
-	          _react2.default.createElement(Screen, { tau: 3, data: data, camera: camera }),
-	          _react2.default.createElement(Screen, { tau: 4, data: data, camera: camera })
+	          { style: { display: 'flex' } },
+	          _react2.default.createElement(
+	            'div',
+	            { style: { margin: '0 10px' } },
+	            _react2.default.createElement(
+	              'div',
+	              null,
+	              _react2.default.createElement(
+	                'p',
+	                null,
+	                'E = 2'
+	              )
+	            ),
+	            _react2.default.createElement(
+	              'div',
+	              null,
+	              _react2.default.createElement(Chart, { E: 2, tau: 1, data: data }),
+	              _react2.default.createElement(Chart, { E: 2, tau: 2, data: data })
+	            )
+	          ),
+	          _react2.default.createElement(
+	            'div',
+	            { style: { margin: '0 10px' } },
+	            _react2.default.createElement(
+	              'div',
+	              null,
+	              _react2.default.createElement(
+	                'p',
+	                null,
+	                'E = 3'
+	              )
+	            ),
+	            _react2.default.createElement(
+	              'div',
+	              null,
+	              _react2.default.createElement(Chart, { E: 3, tau: 1, data: data }),
+	              _react2.default.createElement(Chart, { E: 3, tau: 2, data: data })
+	            )
+	          )
+	        ),
+	        _react2.default.createElement(
+	          'div',
+	          { style: { display: 'flex' } },
+	          _react2.default.createElement(
+	            'div',
+	            { style: { margin: '0 10px' } },
+	            _react2.default.createElement(
+	              'div',
+	              null,
+	              _react2.default.createElement(
+	                'p',
+	                null,
+	                'E = 2'
+	              )
+	            ),
+	            _react2.default.createElement(
+	              'div',
+	              null,
+	              _react2.default.createElement(Screen, { E: 2, tau: 1, data: data, camera: camera }),
+	              _react2.default.createElement(Screen, { E: 2, tau: 2, data: data, camera: camera })
+	            )
+	          ),
+	          _react2.default.createElement(
+	            'div',
+	            { style: { margin: '0 10px' } },
+	            _react2.default.createElement(
+	              'div',
+	              null,
+	              _react2.default.createElement(
+	                'p',
+	                null,
+	                'E = 3'
+	              )
+	            ),
+	            _react2.default.createElement(
+	              'div',
+	              null,
+	              _react2.default.createElement(Screen, { E: 3, tau: 1, data: data, camera: camera }),
+	              _react2.default.createElement(Screen, { E: 3, tau: 2, data: data, camera: camera })
+	            )
+	          )
 	        )
 	      );
 	    }
