@@ -8,7 +8,7 @@ const screenSize = 600
 
 class Screen extends React.Component {
   componentDidMount () {
-    const {n, tau, data, camera} = this.props
+    const {tau, data, camera} = this.props
 
     const xScene = new THREE.Scene()
     const yScene = new THREE.Scene()
@@ -22,18 +22,20 @@ class Screen extends React.Component {
     yRenderer.setSize(screenSize, screenSize)
     this.refs.yWrapper.appendChild(yRenderer.domElement)
 
-    const color = d3.scale.category20()
-    data.forEach((item, j) => {
-      const xGeometry = new THREE.Geometry()
-      const yGeometry = new THREE.Geometry()
-      const material = new THREE.LineBasicMaterial({color: new THREE.Color(color(j))})
-      for (let i = 0; i < n - tau * 2; ++i) {
-        xGeometry.vertices.push(new THREE.Vector3(item[`x${i}`] - 0.5, item[`x${i + tau}`] - 0.5, item[`x${i + 2 * tau}`] - 0.5))
-        yGeometry.vertices.push(new THREE.Vector3(item[`y${i}`] - 0.5, item[`y${i + tau}`] - 0.5, item[`y${i + 2 * tau}`] - 0.5))
-      }
-      xScene.add(new THREE.Line(xGeometry, material))
-      yScene.add(new THREE.Line(yGeometry, material))
-    })
+    const xScale = d3.scale.linear()
+      .domain(d3.extent(data, (d) => +d.X))
+      .range([-0.5, 0.5])
+    const yScale = d3.scale.linear()
+      .domain(d3.extent(data, (d) => +d.Y))
+      .range([-0.5, 0.5])
+    const xGeometry = new THREE.Geometry()
+    const yGeometry = new THREE.Geometry()
+    for (let i = tau * 2; i < data.length; ++i) {
+      xGeometry.vertices.push(new THREE.Vector3(xScale(data[i].X), xScale(data[i - tau].X), xScale(data[i - 2 * tau].X)))
+      yGeometry.vertices.push(new THREE.Vector3(yScale(data[i].Y), yScale(data[i - tau].Y), yScale(data[i - 2 * tau].Y)))
+    }
+    xScene.add(new THREE.Line(xGeometry, new THREE.LineBasicMaterial({color: new THREE.Color(0xff0000)})))
+    yScene.add(new THREE.Line(yGeometry, new THREE.LineBasicMaterial({color: new THREE.Color(0x0000ff)})))
 
     const xControls = new OrbitControls(camera, xRenderer.domElement)
     const yControls = new OrbitControls(camera, yRenderer.domElement)
@@ -63,25 +65,24 @@ class Screen extends React.Component {
 
 class App extends React.Component {
   render () {
-    const {n, data} = this.props
+    const {data} = this.props
     // const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
     const camera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 1000)
     return <div>
       <div>
         <p>n = {data.length}</p>
-        <p>T_max = {n}</p>
         <p>E = 3</p>
       </div>
       <div>
-        <Screen n={n} tau={1} data={data} camera={camera} />
-        <Screen n={n} tau={2} data={data} camera={camera} />
-        <Screen n={n} tau={3} data={data} camera={camera} />
-        <Screen n={n} tau={4} data={data} camera={camera} />
+        <Screen tau={1} data={data} camera={camera} />
+        <Screen tau={2} data={data} camera={camera} />
+        <Screen tau={3} data={data} camera={camera} />
+        <Screen tau={4} data={data} camera={camera} />
       </div>
     </div>
   }
 }
 
 d3.csv('data.csv', (data) => {
-  render(<App n={100} data={data} />, document.getElementById('content'))
+  render(<App data={data} />, document.getElementById('content'))
 })
