@@ -70,115 +70,6 @@
 
 	function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
-	var correl = function correl(n, x, y) {
-	  var xbar = 0;
-	  var ybar = 0;
-	  for (var i = 0; i < n; ++i) {
-	    xbar += x[i];
-	    ybar += y[i];
-	  }
-	  xbar /= n;
-	  ybar /= n;
-	  var xx = 0;
-	  var xy = 0;
-	  var yy = 0;
-	  for (var _i = 0; _i < n; ++_i) {
-	    xx += (x[_i] - xbar) * (x[_i] - xbar);
-	    xy += (x[_i] - xbar) * (y[_i] - ybar);
-	    yy += (y[_i] - ybar) * (y[_i] - ybar);
-	  }
-	  return xy / Math.sqrt(xx * yy);
-	};
-
-	var norm = function norm(n, x, y) {
-	  var sum = 0;
-	  for (var i = 0; i < n; ++i) {
-	    var diff = x[i] - y[i];
-	    sum += diff * diff;
-	  }
-	  return Math.sqrt(sum);
-	};
-
-	var weight = function weight(E, xi, i, library) {
-	  var values = library.map(function (xj, j) {
-	    return { norm: norm(E, xi, xj), index: j };
-	  }).filter(function (_, j) {
-	    return i !== j;
-	  });
-	  values.sort(function (v1, v2) {
-	    return v1.norm - v2.norm;
-	  });
-	  var w = [];
-	  for (var j = 0; j < E + 1; ++j) {
-	    w.push(values[j]);
-	  }
-	  var sumw = 0;
-	  w.forEach(function (_, j) {
-	    w[j].weight = Math.exp(-w[j].norm / w[0].norm);
-	    sumw += w[j].weight;
-	  });
-	  w.forEach(function (_, j) {
-	    w[j].weight /= sumw;
-	  });
-	  return w;
-	};
-
-	var ccm = function ccm(n, X, Y, E, tau, lMin) {
-	  var XE = [];
-	  for (var i = (E - 1) * tau; i < n; ++i) {
-	    var x = [];
-	    for (var j = 0; j < E; ++j) {
-	      x.push(X[i - tau * j]);
-	    }
-	    XE.push(x);
-	  }
-	  var rho = [];
-	  var Yexact = Y.slice(n - XE.length);
-
-	  var _loop = function _loop(l) {
-	    var library = XE.slice(0, l);
-	    var Yest = [];
-	    XE.forEach(function (x, i) {
-	      var w = weight(E, x, i, library);
-	      var Yesti = 0;
-	      var _iteratorNormalCompletion = true;
-	      var _didIteratorError = false;
-	      var _iteratorError = undefined;
-
-	      try {
-	        for (var _iterator = w[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-	          var _step$value = _step.value;
-	          var _weight = _step$value.weight;
-	          var index = _step$value.index;
-
-	          Yesti += _weight * Y[index];
-	        }
-	      } catch (err) {
-	        _didIteratorError = true;
-	        _iteratorError = err;
-	      } finally {
-	        try {
-	          if (!_iteratorNormalCompletion && _iterator.return) {
-	            _iterator.return();
-	          }
-	        } finally {
-	          if (_didIteratorError) {
-	            throw _iteratorError;
-	          }
-	        }
-	      }
-
-	      Yest.push(Yesti);
-	    });
-	    rho.push(correl(XE.length, Yexact, Yest));
-	  };
-
-	  for (var l = lMin; l < XE.length; ++l) {
-	    _loop(l);
-	  }
-	  return rho;
-	};
-
 	var OrbitControls = __webpack_require__(170)(_three2.default);
 	var screenSize = 600;
 
@@ -262,37 +153,86 @@
 	var Chart = function (_React$Component2) {
 	  _inherits(Chart, _React$Component2);
 
-	  function Chart() {
+	  function Chart(props) {
 	    _classCallCheck(this, Chart);
 
-	    return _possibleConstructorReturn(this, Object.getPrototypeOf(Chart).apply(this, arguments));
+	    var _this2 = _possibleConstructorReturn(this, Object.getPrototypeOf(Chart).call(this, props));
+
+	    _this2.state = {
+	      rhoX: [],
+	      rhoY: []
+	    };
+	    return _this2;
 	  }
 
 	  _createClass(Chart, [{
-	    key: 'render',
-	    value: function render() {
+	    key: 'componentDidMount',
+	    value: function componentDidMount() {
+	      var _this3 = this;
+
+	      var lMin = 100;
+	      var step = 100;
 	      var _props2 = this.props;
 	      var data = _props2.data;
 	      var E = _props2.E;
 	      var tau = _props2.tau;
 
-	      var rhoX = ccm(data.length, data.map(function (d) {
-	        return +d.X;
-	      }), data.map(function (d) {
-	        return +d.Y;
-	      }), E, tau, 10);
-	      var rhoY = ccm(data.length, data.map(function (d) {
-	        return +d.Y;
-	      }), data.map(function (d) {
-	        return +d.X;
-	      }), E, tau, 10);
+	      var xWorker = new window.Worker('worker.js');
+	      xWorker.onmessage = function (event) {
+	        _this3.setState({
+	          rhoX: event.data
+	        });
+	      };
+	      xWorker.postMessage({
+	        n: data.length,
+	        X: data.map(function (d) {
+	          return +d.X;
+	        }),
+	        Y: data.map(function (d) {
+	          return +d.Y;
+	        }),
+	        E: E,
+	        tau: tau,
+	        lMin: lMin,
+	        step: step
+	      });
+	      var yWorker = new window.Worker('worker.js');
+	      yWorker.onmessage = function (event) {
+	        _this3.setState({
+	          rhoY: event.data
+	        });
+	      };
+	      yWorker.postMessage({
+	        n: data.length,
+	        X: data.map(function (d) {
+	          return +d.Y;
+	        }),
+	        Y: data.map(function (d) {
+	          return +d.X;
+	        }),
+	        E: E,
+	        tau: tau,
+	        lMin: lMin,
+	        step: step
+	      });
+	    }
+	  }, {
+	    key: 'render',
+	    value: function render() {
+	      var tau = this.props.tau;
+	      var _state = this.state;
+	      var rhoX = _state.rhoX;
+	      var rhoY = _state.rhoY;
+
 	      var svgSize = 500;
-	      var xScale = _d2.default.scale.linear().domain([0, rhoX.length - 1]).range([0, svgSize]);
+	      var xScale = _d2.default.scale.linear().domain([0, _d2.default.max(rhoX, function (d) {
+	        return d[0];
+	      })]).range([0, svgSize]);
 	      var yScale = _d2.default.scale.linear().domain([-1, 1]).range([svgSize, 0]);
-	      var line = _d2.default.svg.line().x(function (_, i) {
-	        return xScale(i);
+	      var line = _d2.default.svg.line().x(function (d) {
+	        return xScale(d[0]);
 	      }).y(function (d) {
-	        return yScale(d);
+	        return yScale(d[1]);
 	      });
 	      return _react2.default.createElement(
 	        'div',
@@ -386,7 +326,6 @@
 	    key: 'render',
 	    value: function render() {
 	      var data = this.props.data;
-	      // const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
 
 	      var camera = new _three2.default.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 1000);
 	      return _react2.default.createElement(
