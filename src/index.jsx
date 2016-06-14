@@ -3,82 +3,6 @@ import d3 from 'd3'
 import THREE from 'three'
 import {render} from 'react-dom'
 
-const correl = (n, x, y) => {
-  let xbar = 0
-  let ybar = 0
-  for (let i = 0; i < n; ++i) {
-    xbar += x[i]
-    ybar += y[i]
-  }
-  xbar /= n
-  ybar /= n
-  let xx = 0
-  let xy = 0
-  let yy = 0
-  for (let i = 0; i < n; ++i) {
-    xx += (x[i] - xbar) * (x[i] - xbar)
-    xy += (x[i] - xbar) * (y[i] - ybar)
-    yy += (y[i] - ybar) * (y[i] - ybar)
-  }
-  return xy / Math.sqrt(xx * yy)
-}
-
-const norm = (n, x, y) => {
-  let sum = 0
-  for (let i = 0; i < n; ++i) {
-    const diff = x[i] - y[i]
-    sum += diff * diff
-  }
-  return Math.sqrt(sum)
-}
-
-const weight = (E, xi, i, library) => {
-  const values = library
-    .map((xj, j) => ({norm: norm(E, xi, xj), index: j}))
-    .filter((_, j) => i !== j)
-  values.sort((v1, v2) => v1.norm - v2.norm)
-  const w = []
-  for (let j = 0; j < E + 1; ++j) {
-    w.push(values[j])
-  }
-  let sumw = 0
-  w.forEach((_, j) => {
-    w[j].weight = Math.exp(-w[j].norm / w[0].norm)
-    sumw += w[j].weight
-  })
-  w.forEach((_, j) => {
-    w[j].weight /= sumw
-  })
-  return w
-}
-
-const ccm = (n, X, Y, E, tau, lMin) => {
-  const XE = []
-  for (let i = (E - 1) * tau; i < n; ++i) {
-    const x = []
-    for (let j = 0; j < E; ++j) {
-      x.push(X[i - tau * j])
-    }
-    XE.push(x)
-  }
-  const rho = []
-  const Yexact = Y.slice(n - XE.length)
-  for (let l = lMin; l < XE.length; ++l) {
-    const library = XE.slice(0, l)
-    const Yest = []
-    XE.forEach((x, i) => {
-      const w = weight(E, x, i, library)
-      let Yesti = 0
-      for (const {weight, index} of w) {
-        Yesti += weight * Y[index]
-      }
-      Yest.push(Yesti)
-    })
-    rho.push(correl(XE.length, Yexact, Yest))
-  }
-  return rho
-}
-
 const OrbitControls = require('three-orbit-controls')(THREE)
 const screenSize = 600
 
@@ -131,10 +55,49 @@ class Screen extends React.Component {
 }
 
 class Chart extends React.Component {
-  render () {
+  constructor (props) {
+    super(props)
+    this.state = {
+      rhoX: [],
+      rhoY: []
+    }
+  }
+
+  componentDidMount () {
     const {data, E, tau} = this.props
-    const rhoX = ccm(data.length, data.map((d) => +d.X), data.map((d) => +d.Y), E, tau, 10)
-    const rhoY = ccm(data.length, data.map((d) => +d.Y), data.map((d) => +d.X), E, tau, 10)
+    const xWorker = new window.Worker('worker.js')
+    xWorker.onmessage = (event) => {
+      this.setState({
+        rhoX: event.data
+      })
+    }
+    xWorker.postMessage({
+      n: data.length,
+      X: data.map((d) => +d.X),
+      Y: data.map((d) => +d.Y),
+      E,
+      tau,
+      lMin: 10
+    })
+    const yWorker = new window.Worker('worker.js')
+    yWorker.onmessage = (event) => {
+      this.setState({
+        rhoY: event.data
+      })
+    }
+    yWorker.postMessage({
+      n: data.length,
+      X: data.map((d) => +d.Y),
+      Y: data.map((d) => +d.X),
+      E,
+      tau,
+      lMin: 10
+    })
+  }
+
+  render () {
+    const {tau} = this.props
+    const {rhoX, rhoY} = this.state
     const svgSize = 500
     const xScale = d3.scale.linear()
       .domain([0, rhoX.length - 1])
@@ -186,20 +149,11 @@ class App extends React.Component {
       <div style={{display: 'flex'}}>
         <div style={{margin: '0 10px'}}>
           <div>
-            <p>E = 2</p>
+            <p>E = 4</p>
           </div>
           <div>
-            <Chart E={2} tau={1} data={data} />
-            <Chart E={2} tau={2} data={data} />
-          </div>
-        </div>
-        <div style={{margin: '0 10px'}}>
-          <div>
-            <p>E = 3</p>
-          </div>
-          <div>
-            <Chart E={3} tau={1} data={data} />
-            <Chart E={3} tau={2} data={data} />
+            <Chart E={4} tau={1} data={data} />
+            <Chart E={4} tau={2} data={data} />
           </div>
         </div>
       </div>

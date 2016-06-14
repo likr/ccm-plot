@@ -1,4 +1,4 @@
-var path = require('path');
+const path = require('path')
 
 module.exports = {
   module: {
@@ -9,20 +9,21 @@ module.exports = {
         loader: 'babel-loader',
         query: {
           presets: ['es2015'],
-          plugins: ['transform-react-jsx'],
-        },
-      },
-    ],
+          plugins: ['transform-react-jsx']
+        }
+      }
+    ]
   },
   entry: {
     bundle: './src/index',
+    worker: './src/worker'
   },
   output: {
     path: path.join(__dirname, 'public'),
-    filename: '[name].js',
+    filename: '[name].js'
   },
   resolve: {
-    extensions: ['', '.js', '.jsx'],
-  },
-};
+    extensions: ['', '.js', '.jsx']
+  }
+}
 
