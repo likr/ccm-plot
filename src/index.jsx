@@ -64,6 +64,8 @@ class Chart extends React.Component {
   }
 
   componentDidMount () {
+    const lMin = 100
+    const step = 100
     const {data, E, tau} = this.props
     const xWorker = new window.Worker('worker.js')
     xWorker.onmessage = (event) => {
@@ -77,7 +79,8 @@ class Chart extends React.Component {
       Y: data.map((d) => +d.Y),
       E,
       tau,
-      lMin: 10
+      lMin,
+      step
     })
     const yWorker = new window.Worker('worker.js')
     yWorker.onmessage = (event) => {
@@ -91,7 +94,8 @@ class Chart extends React.Component {
       Y: data.map((d) => +d.X),
       E,
       tau,
-      lMin: 10
+      lMin,
+      step
     })
   }
 
@@ -100,14 +104,14 @@ class Chart extends React.Component {
     const {rhoX, rhoY} = this.state
     const svgSize = 500
     const xScale = d3.scale.linear()
-      .domain([0, rhoX.length - 1])
+      .domain([0, d3.max(rhoX, (d) => d[0])])
       .range([0, svgSize])
     const yScale = d3.scale.linear()
       .domain([-1, 1])
       .range([svgSize, 0])
     const line = d3.svg.line()
-      .x((_, i) => xScale(i))
-      .y((d) => yScale(d))
+      .x((d) => xScale(d[0]))
+      .y((d) => yScale(d[1]))
     return <div>
       <p>tau = {tau}</p>
       <div>
@@ -140,7 +144,6 @@ class Chart extends React.Component {
 class App extends React.Component {
   render () {
     const {data} = this.props
-    // const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000)
     const camera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 1000)
     return <div>
       <div>
@@ -149,11 +152,20 @@ class App extends React.Component {
       <div style={{display: 'flex'}}>
         <div style={{margin: '0 10px'}}>
           <div>
-            <p>E = 4</p>
+            <p>E = 2</p>
           </div>
           <div>
-            <Chart E={4} tau={1} data={data} />
-            <Chart E={4} tau={2} data={data} />
+            <Chart E={2} tau={1} data={data} />
+            <Chart E={2} tau={2} data={data} />
+          </div>
+        </div>
+        <div style={{margin: '0 10px'}}>
+          <div>
+            <p>E = 3</p>
+          </div>
+          <div>
+            <Chart E={3} tau={1} data={data} />
+            <Chart E={3} tau={2} data={data} />
           </div>
         </div>
       </div>

@@ -49,7 +49,7 @@ const weight = (E, xi, i, library) => {
   return w
 }
 
-const ccm = (n, X, Y, E, tau, lMin) => {
+const ccm = (n, X, Y, E, tau, lMin, step) => {
   const XE = []
   for (let i = (E - 1) * tau; i < n; ++i) {
     const x = []
@@ -60,7 +60,7 @@ const ccm = (n, X, Y, E, tau, lMin) => {
   }
   const rho = []
   const Yexact = Y.slice(n - XE.length)
-  for (let l = lMin; l < XE.length; ++l) {
+  for (let l = lMin; l < XE.length; l += step) {
     const library = XE.slice(0, l)
     const Yest = []
     XE.forEach((x, i) => {
@@ -71,12 +71,12 @@ const ccm = (n, X, Y, E, tau, lMin) => {
       }
       Yest.push(Yesti)
     })
-    rho.push(correl(XE.length, Yexact, Yest))
+    rho.push([l, correl(XE.length, Yexact, Yest)])
   }
   return rho
 }
 
 onmessage = (event) => {
-  const {n, X, Y, E, tau, lMin} = event.data
-  postMessage(ccm(n, X, Y, E, tau, lMin))
+  const {n, X, Y, E, tau, lMin, step} = event.data
+  postMessage(ccm(n, X, Y, E, tau, lMin, step))
 }
