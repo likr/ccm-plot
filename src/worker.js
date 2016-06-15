@@ -1,4 +1,5 @@
 /* eslint-env worker */
+import quickselect from 'quickselect'
 
 const correl = (n, x, y) => {
   let xbar = 0
@@ -29,15 +30,27 @@ const norm = (n, x, y) => {
   return Math.sqrt(sum)
 }
 
-const weight = (E, xi, i, library) => {
-  const values = library
-    .map((xj, j) => ({norm: norm(E, xi, xj), index: j}))
-    .filter((_, j) => i !== j)
-  values.sort((v1, v2) => v1.norm - v2.norm)
+const normMatrix = (E, XE) => {
+  const n = XE.length
+  const matrix = new Array(n)
+  for (let i = 0; i < n; ++i) {
+    const row = new Array(n)
+    for (let j = 0; j < n; ++j) {
+      row[j] = norm(E, XE[i], XE[j]) || 1e-8
+    }
+    matrix[i] = row
+  }
+  return matrix
+}
+
+const weight = (E, xi, i, library, matrix) => {
+  const values = library.map((j) => ({norm: matrix[i][j], index: j}))
+  quickselect(values, E + 1, null, null, (v1, v2) => v1.norm - v2.norm)
   const w = []
   for (let j = 0; j < E + 1; ++j) {
     w.push(values[j])
   }
+  quickselect(w, 1, null, null, (v1, v2) => v1.norm - v2.norm)
   let sumw = 0
   w.forEach((_, j) => {
     w[j].weight = Math.exp(-w[j].norm / w[0].norm)
@@ -58,25 +71,34 @@ const ccm = (n, X, Y, E, tau, lMin, step) => {
     }
     XE.push(x)
   }
+  const m = XE.length
+  const matrix = normMatrix(E, XE)
   const rho = []
-  const Yexact = Y.slice(n - XE.length)
-  for (let l = lMin; l < XE.length; l += step) {
-    const library = XE.slice(0, l)
+  const Yexact = Y.slice(n - m)
+  for (let l = lMin; l < m; l += step) {
+    const library = new Array(l)
+    for (let i = 0; i < l; ++i) {
+      library[i] = Math.floor(Math.random() * m)
+    }
     const Yest = []
     XE.forEach((x, i) => {
-      const w = weight(E, x, i, library)
+      const w = weight(E, x, i, library, matrix)
       let Yesti = 0
       for (const {weight, index} of w) {
         Yesti += weight * Y[index]
       }
       Yest.push(Yesti)
     })
-    rho.push([l, correl(XE.length, Yexact, Yest)])
+    rho.push([l, correl(m, Yexact, Yest)])
   }
   return rho
 }
 
 onmessage = (event) => {
   const {n, X, Y, E, tau, lMin, lStep} = event.data
-  postMessage(ccm(n, X, Y, E, tau, lMin, lStep))
+  const timeId = `ccm${Math.random()}`
+  console.time(timeId)
+  const result = ccm(n, X, Y, E, tau, lMin, lStep)
+  console.timeEnd(timeId)
+  postMessage(result)
 }
