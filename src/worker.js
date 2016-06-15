@@ -44,11 +44,11 @@ const normMatrix = (E, XE) => {
 }
 
 const weight = (E, xi, i, library, matrix) => {
-  const values = library.map((j) => ({norm: matrix[i][j], index: j}))
-  quickselect(values, E + 1, null, null, (v1, v2) => v1.norm - v2.norm)
-  const w = []
-  for (let j = 0; j < E + 1; ++j) {
-    w.push(values[j])
+  quickselect(library, E + 1, null, null, (j1, j2) => matrix[i][j1] - matrix[i][j2])
+  const w = new Array(E)
+  for (let k = 0; k < E + 1; ++k) {
+    const j = library[k]
+    w[k] = {norm: matrix[i][j], index: j}
   }
   quickselect(w, 1, null, null, (v1, v2) => v1.norm - v2.norm)
   let sumw = 0
@@ -62,43 +62,45 @@ const weight = (E, xi, i, library, matrix) => {
   return w
 }
 
-const ccm = (n, X, Y, E, tau, lMin, step) => {
-  const XE = []
-  for (let i = (E - 1) * tau; i < n; ++i) {
-    const x = []
+const ccm = (n, X, Y, E, tau, lMin, step, repeatMax) => {
+  const delta = (E - 1) * tau
+  const m = n - delta
+  const XE = new Array(m)
+  for (let i = delta; i < n; ++i) {
+    const x = new Array(E)
     for (let j = 0; j < E; ++j) {
-      x.push(X[i - tau * j])
+      x[j] = X[i - tau * j]
     }
-    XE.push(x)
+    XE[i - delta] = x
   }
-  const m = XE.length
   const matrix = normMatrix(E, XE)
   const rho = []
   const Yexact = Y.slice(n - m)
   for (let l = lMin; l < m; l += step) {
-    const library = new Array(l)
-    for (let i = 0; i < l; ++i) {
-      library[i] = Math.floor(Math.random() * m)
-    }
-    const Yest = []
-    XE.forEach((x, i) => {
-      const w = weight(E, x, i, library, matrix)
-      let Yesti = 0
-      for (const {weight, index} of w) {
-        Yesti += weight * Y[index]
+    let rhoAvg = 0
+    for (let repeat = 0; repeat < repeatMax; ++repeat) {
+      const library = new Array(l)
+      for (let i = 0; i < l; ++i) {
+        library[i] = Math.floor(Math.random() * m)
       }
-      Yest.push(Yesti)
-    })
-    rho.push([l, correl(m, Yexact, Yest)])
+      const Yest = XE.map((x, i) => {
+        const w = weight(E, x, i, library, matrix)
+        let Yesti = 0
+        for (const {weight, index} of w) {
+          Yesti += weight * Y[index]
+        }
+        return Yesti
+      })
+      rhoAvg += correl(m, Yexact, Yest)
+    }
+    rhoAvg /= repeatMax
+    rho.push([l, rhoAvg])
   }
   return rho
 }
 
 onmessage = (event) => {
-  const {n, X, Y, E, tau, lMin, lStep} = event.data
-  const timeId = `ccm${Math.random()}`
-  console.time(timeId)
-  const result = ccm(n, X, Y, E, tau, lMin, lStep)
-  console.timeEnd(timeId)
+  const {n, X, Y, E, tau, lMin, lStep, repeatMax} = event.data
+  const result = ccm(n, X, Y, E, tau, lMin, lStep, repeatMax)
   postMessage(result)
 }

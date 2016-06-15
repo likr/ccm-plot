@@ -65,7 +65,7 @@ class Chart extends React.Component {
   }
 
   componentDidMount () {
-    const {data, E, tau, lMin, lStep} = this.props
+    const {data, E, tau, lMin, lStep, repeatMax} = this.props
     const xWorker = new window.Worker('worker.js')
     xWorker.onmessage = (event) => {
       this.setState({
@@ -79,7 +79,8 @@ class Chart extends React.Component {
       E,
       tau,
       lMin,
-      lStep
+      lStep,
+      repeatMax
     })
     const yWorker = new window.Worker('worker.js')
     yWorker.onmessage = (event) => {
@@ -94,7 +95,8 @@ class Chart extends React.Component {
       E,
       tau,
       lMin,
-      lStep
+      lStep,
+      repeatMax
     })
   }
 
@@ -142,7 +144,7 @@ class Chart extends React.Component {
 
 class App extends React.Component {
   render () {
-    const {data, lMin, lStep} = this.props
+    const {data, lMin, lStep, repeatMax} = this.props
     const camera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 1000)
     return <div>
       <div>
@@ -154,8 +156,8 @@ class App extends React.Component {
             <p>E = 2</p>
           </div>
           <div>
-            <Chart E={2} tau={1} data={data} lMin={lMin} lStep={lStep} />
-            <Chart E={2} tau={2} data={data} lMin={lMin} lStep={lStep} />
+            <Chart E={2} tau={1} data={data} lMin={lMin} lStep={lStep} repeatMax={repeatMax} />
+            <Chart E={2} tau={2} data={data} lMin={lMin} lStep={lStep} repeatMax={repeatMax} />
           </div>
         </div>
         <div style={{margin: '0 10px'}}>
@@ -163,8 +165,8 @@ class App extends React.Component {
             <p>E = 3</p>
           </div>
           <div>
-            <Chart E={3} tau={1} data={data} lMin={lMin} lStep={lStep} />
-            <Chart E={3} tau={2} data={data} lMin={lMin} lStep={lStep} />
+            <Chart E={3} tau={1} data={data} lMin={lMin} lStep={lStep} repeatMax={repeatMax} />
+            <Chart E={3} tau={2} data={data} lMin={lMin} lStep={lStep} repeatMax={repeatMax} />
           </div>
         </div>
       </div>
@@ -197,11 +199,12 @@ class App extends React.Component {
   const file = options.file || 'data/two_species_model.csv'
   const lMin = +options.lmin || 100
   const lStep = +options.lstep || 100
+  const repeatMax = +options.repeatmax || 1
   const xAxis = options.xaxis || 'X'
   const yAxis = options.yaxis || 'Y'
 
   d3.csv(file, (baseData) => {
     const data = baseData.map((d) => ({X: d[xAxis], Y: d[yAxis]}))
-    render(<App data={data} lMin={lMin} lStep={lStep} />, document.getElementById('content'))
+    render(<App data={data} lMin={lMin} lStep={lStep} repeatMax={repeatMax} />, document.getElementById('content'))
   })
 }
