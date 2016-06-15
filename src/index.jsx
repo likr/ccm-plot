@@ -2,6 +2,7 @@ import React from 'react'
 import d3 from 'd3'
 import THREE from 'three'
 import {render} from 'react-dom'
+import querystring from 'querystring'
 
 const OrbitControls = require('three-orbit-controls')(THREE)
 const screenSize = 600
@@ -64,9 +65,7 @@ class Chart extends React.Component {
   }
 
   componentDidMount () {
-    const lMin = 100
-    const step = 100
-    const {data, E, tau} = this.props
+    const {data, E, tau, lMin, lStep} = this.props
     const xWorker = new window.Worker('worker.js')
     xWorker.onmessage = (event) => {
       this.setState({
@@ -80,7 +79,7 @@ class Chart extends React.Component {
       E,
       tau,
       lMin,
-      step
+      lStep
     })
     const yWorker = new window.Worker('worker.js')
     yWorker.onmessage = (event) => {
@@ -95,7 +94,7 @@ class Chart extends React.Component {
       E,
       tau,
       lMin,
-      step
+      lStep
     })
   }
 
@@ -104,7 +103,7 @@ class Chart extends React.Component {
     const {rhoX, rhoY} = this.state
     const svgSize = 500
     const xScale = d3.scale.linear()
-      .domain([0, d3.max(rhoX, (d) => d[0])])
+      .domain([0, Math.max(d3.max(rhoX, (d) => d[0]) || 0, d3.max(rhoY, (d) => d[0]) || 0)])
       .range([0, svgSize])
     const yScale = d3.scale.linear()
       .domain([-1, 1])
@@ -143,7 +142,7 @@ class Chart extends React.Component {
 
 class App extends React.Component {
   render () {
-    const {data} = this.props
+    const {data, lMin, lStep} = this.props
     const camera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 1000)
     return <div>
       <div>
@@ -155,8 +154,8 @@ class App extends React.Component {
             <p>E = 2</p>
           </div>
           <div>
-            <Chart E={2} tau={1} data={data} />
-            <Chart E={2} tau={2} data={data} />
+            <Chart E={2} tau={1} data={data} lMin={lMin} lStep={lStep} />
+            <Chart E={2} tau={2} data={data} lMin={lMin} lStep={lStep} />
           </div>
         </div>
         <div style={{margin: '0 10px'}}>
@@ -164,8 +163,8 @@ class App extends React.Component {
             <p>E = 3</p>
           </div>
           <div>
-            <Chart E={3} tau={1} data={data} />
-            <Chart E={3} tau={2} data={data} />
+            <Chart E={3} tau={1} data={data} lMin={lMin} lStep={lStep} />
+            <Chart E={3} tau={2} data={data} lMin={lMin} lStep={lStep} />
           </div>
         </div>
       </div>
@@ -193,6 +192,16 @@ class App extends React.Component {
   }
 }
 
-d3.csv('data.csv', (data) => {
-  render(<App data={data} />, document.getElementById('content'))
-})
+{
+  const options = querystring.parse(window.location.search.substr(1))
+  const file = options.file || 'data/two_species_model.csv'
+  const lMin = +options.lmin || 100
+  const lStep = +options.lstep || 100
+  const xAxis = options.xaxis || 'X'
+  const yAxis = options.yaxis || 'Y'
+
+  d3.csv(file, (baseData) => {
+    const data = baseData.map((d) => ({X: d[xAxis], Y: d[yAxis]}))
+    render(<App data={data} lMin={lMin} lStep={lStep} />, document.getElementById('content'))
+  })
+}

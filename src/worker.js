@@ -77,6 +77,6 @@ const ccm = (n, X, Y, E, tau, lMin, step) => {
 }
 
 onmessage = (event) => {
-  const {n, X, Y, E, tau, lMin, step} = event.data
-  postMessage(ccm(n, X, Y, E, tau, lMin, step))
+  const {n, X, Y, E, tau, lMin, lStep} = event.data
+  postMessage(ccm(n, X, Y, E, tau, lMin, lStep))
 }
