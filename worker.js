@@ -97,15 +97,13 @@
 	};
 
 	var weight = function weight(E, xi, i, library, matrix) {
-	  var values = library.map(function (j) {
-	    return { norm: matrix[i][j], index: j };
+	  (0, _quickselect2.default)(library, E + 1, null, null, function (j1, j2) {
+	    return matrix[i][j1] - matrix[i][j2];
 	  });
-	  (0, _quickselect2.default)(values, E + 1, null, null, function (v1, v2) {
-	    return v1.norm - v2.norm;
-	  });
-	  var w = [];
-	  for (var j = 0; j < E + 1; ++j) {
-	    w.push(values[j]);
+	  var w = new Array(E);
+	  for (var k = 0; k < E + 1; ++k) {
+	    var j = library[k];
+	    w[k] = { norm: matrix[i][j], index: j };
 	  }
 	  (0, _quickselect2.default)(w, 1, null, null, function (v1, v2) {
 	    return v1.norm - v2.norm;
@@ -121,63 +119,68 @@
 	  return w;
 	};
 
-	var ccm = function ccm(n, X, Y, E, tau, lMin, step) {
-	  var XE = [];
-	  for (var i = (E - 1) * tau; i < n; ++i) {
-	    var x = [];
+	var ccm = function ccm(n, X, Y, E, tau, lMin, step, repeatMax) {
+	  var delta = (E - 1) * tau;
+	  var m = n - delta;
+	  var XE = new Array(m);
+	  for (var i = delta; i < n; ++i) {
+	    var x = new Array(E);
 	    for (var j = 0; j < E; ++j) {
-	      x.push(X[i - tau * j]);
+	      x[j] = X[i - tau * j];
 	    }
-	    XE.push(x);
+	    XE[i - delta] = x;
 	  }
-	  var m = XE.length;
 	  var matrix = normMatrix(E, XE);
 	  var rho = [];
 	  var Yexact = Y.slice(n - m);
-
-	  var _loop = function _loop(l) {
-	    var library = new Array(l);
-	    for (var _i2 = 0; _i2 < l; ++_i2) {
-	      library[_i2] = Math.floor(Math.random() * m);
-	    }
-	    var Yest = [];
-	    XE.forEach(function (x, i) {
-	      var w = weight(E, x, i, library, matrix);
-	      var Yesti = 0;
-	      var _iteratorNormalCompletion = true;
-	      var _didIteratorError = false;
-	      var _iteratorError = undefined;
-
-	      try {
-	        for (var _iterator = w[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
-	          var _step$value = _step.value;
-	          var _weight = _step$value.weight;
-	          var index = _step$value.index;
-
-	          Yesti += _weight * Y[index];
-	        }
-	      } catch (err) {
-	        _didIteratorError = true;
-	        _iteratorError = err;
-	      } finally {
-	        try {
-	          if (!_iteratorNormalCompletion && _iterator.return) {
-	            _iterator.return();
-	          }
-	        } finally {
-	          if (_didIteratorError) {
-	            throw _iteratorError;
-	          }
-	        }
-	      }
-
-	      Yest.push(Yesti);
-	    });
-	    rho.push([l, correl(m, Yexact, Yest)]);
-	  };
-
 	  for (var l = lMin; l < m; l += step) {
-	    _loop(l);
+	    var rhoAvg = 0;
+
+	    var _loop = function _loop(repeat) {
+	      var library = new Array(l);
+	      for (var _i2 = 0; _i2 < l; ++_i2) {
+	        library[_i2] = Math.floor(Math.random() * m);
+	      }
+	      var Yest = XE.map(function (x, i) {
+	        var w = weight(E, x, i, library, matrix);
+	        var Yesti = 0;
+	        var _iteratorNormalCompletion = true;
+	        var _didIteratorError = false;
+	        var _iteratorError = undefined;
+
+	        try {
+	          for (var _iterator = w[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+	            var _step$value = _step.value;
+	            var _weight = _step$value.weight;
+	            var index = _step$value.index;
+
+	            Yesti += _weight * Y[index];
+	          }
+	        } catch (err) {
+	          _didIteratorError = true;
+	          _iteratorError = err;
+	        } finally {
+	          try {
+	            if (!_iteratorNormalCompletion && _iterator.return) {
+	              _iterator.return();
+	            }
+	          } finally {
+	            if (_didIteratorError) {
+	              throw _iteratorError;
+	            }
+	          }
+	        }
+
+	        return Yesti;
+	      });
+	      rhoAvg += correl(m, Yexact, Yest);
+	    };
+
+	    for (var repeat = 0; repeat < repeatMax; ++repeat) {
+	      _loop(repeat);
+	    }
+	    rhoAvg /= repeatMax;
+	    rho.push([l, rhoAvg]);
 	  }
 	  return rho;
 	};
@@ -191,11 +194,9 @@
 	  var tau = _event$data.tau;
 	  var lMin = _event$data.lMin;
 	  var lStep = _event$data.lStep;
+	  var repeatMax = _event$data.repeatMax;
 
-	  var timeId = 'ccm' + Math.random();
-	  console.time(timeId);
-	  var result = ccm(n, X, Y, E, tau, lMin, lStep);
-	  console.timeEnd(timeId);
+	  var result = ccm(n, X, Y, E, tau, lMin, lStep, repeatMax);
 	  postMessage(result);
 	};
 

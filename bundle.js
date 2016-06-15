@@ -180,6 +180,7 @@
 	      var tau = _props2.tau;
 	      var lMin = _props2.lMin;
 	      var lStep = _props2.lStep;
+	      var repeatMax = _props2.repeatMax;
 
 	      var xWorker = new window.Worker('worker.js');
 	      xWorker.onmessage = function (event) {
@@ -198,7 +199,8 @@
 	        E: E,
 	        tau: tau,
 	        lMin: lMin,
-	        lStep: lStep
+	        lStep: lStep,
+	        repeatMax: repeatMax
 	      });
 	      var yWorker = new window.Worker('worker.js');
 	      yWorker.onmessage = function (event) {
@@ -217,7 +219,8 @@
 	        E: E,
 	        tau: tau,
 	        lMin: lMin,
-	        lStep: lStep
+	        lStep: lStep,
+	        repeatMax: repeatMax
 	      });
 	    }
 	  }, {
@@ -335,6 +338,7 @@
 	      var data = _props3.data;
 	      var lMin = _props3.lMin;
 	      var lStep = _props3.lStep;
+	      var repeatMax = _props3.repeatMax;
 
 	      var camera = new _three2.default.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 1000);
 	      return _react2.default.createElement(
@@ -368,8 +372,8 @@
 	            _react2.default.createElement(
 	              'div',
 	              null,
-	              _react2.default.createElement(Chart, { E: 2, tau: 1, data: data, lMin: lMin, lStep: lStep }),
-	              _react2.default.createElement(Chart, { E: 2, tau: 2, data: data, lMin: lMin, lStep: lStep })
+	              _react2.default.createElement(Chart, { E: 2, tau: 1, data: data, lMin: lMin, lStep: lStep, repeatMax: repeatMax }),
+	              _react2.default.createElement(Chart, { E: 2, tau: 2, data: data, lMin: lMin, lStep: lStep, repeatMax: repeatMax })
 	            )
 	          ),
 	          _react2.default.createElement(
@@ -387,8 +391,8 @@
 	            _react2.default.createElement(
 	              'div',
 	              null,
-	              _react2.default.createElement(Chart, { E: 3, tau: 1, data: data, lMin: lMin, lStep: lStep }),
-	              _react2.default.createElement(Chart, { E: 3, tau: 2, data: data, lMin: lMin, lStep: lStep })
+	              _react2.default.createElement(Chart, { E: 3, tau: 1, data: data, lMin: lMin, lStep: lStep, repeatMax: repeatMax }),
+	              _react2.default.createElement(Chart, { E: 3, tau: 2, data: data, lMin: lMin, lStep: lStep, repeatMax: repeatMax })
 	            )
 	          )
 	        ),
@@ -447,6 +451,7 @@
 	    var file = options.file || 'data/two_species_model.csv';
 	    var lMin = +options.lmin || 100;
 	    var lStep = +options.lstep || 100;
+	    var repeatMax = +options.repeatmax || 1;
 	    var xAxis = options.xaxis || 'X';
 	    var yAxis = options.yaxis || 'Y';
 
@@ -454,7 +459,7 @@
 	      var data = baseData.map(function (d) {
 	        return { X: d[xAxis], Y: d[yAxis] };
 	      });
-	      (0, _reactDom.render)(_react2.default.createElement(App, { data: data, lMin: lMin, lStep: lStep }), document.getElementById('content'));
+	      (0, _reactDom.render)(_react2.default.createElement(App, { data: data, lMin: lMin, lStep: lStep, repeatMax: repeatMax }), document.getElementById('content'));
 	    });
 	  })();
 	}
