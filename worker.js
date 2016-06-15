@@ -40,13 +40,18 @@
 /******/ 	return __webpack_require__(0);
 /******/ })
 /************************************************************************/
-/******/ ([
-/* 0 */
-/***/ function(module, exports) {
+/******/ ({
 
-	"use strict";
+/***/ 0:
+/***/ function(module, exports, __webpack_require__) {
 
-	/* eslint-env worker */
+	'use strict';
+
+	var _quickselect = __webpack_require__(174);
+
+	var _quickselect2 = _interopRequireDefault(_quickselect);
+
+	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 	var correl = function correl(n, x, y) {
 	  var xbar = 0;
@@ -66,7 +71,8 @@
 	    yy += (y[_i] - ybar) * (y[_i] - ybar);
 	  }
 	  return xy / Math.sqrt(xx * yy);
-	};
+	}; /* eslint-env worker */
+
 
 	var norm = function norm(n, x, y) {
 	  var sum = 0;
@@ -77,19 +83,33 @@
 	  return Math.sqrt(sum);
 	};
 
-	var weight = function weight(E, xi, i, library) {
-	  var values = library.map(function (xj, j) {
-	    return { norm: norm(E, xi, xj), index: j };
-	  }).filter(function (_, j) {
-	    return i !== j;
+	var normMatrix = function normMatrix(E, XE) {
+	  var n = XE.length;
+	  var matrix = new Array(n);
+	  for (var i = 0; i < n; ++i) {
+	    var row = new Array(n);
+	    for (var j = 0; j < n; ++j) {
+	      row[j] = norm(E, XE[i], XE[j]) || 1e-8;
+	    }
+	    matrix[i] = row;
+	  }
+	  return matrix;
+	};
+
+	var weight = function weight(E, xi, i, library, matrix) {
+	  var values = library.map(function (j) {
+	    return { norm: matrix[i][j], index: j };
 	  });
-	  values.sort(function (v1, v2) {
+	  (0, _quickselect2.default)(values, E + 1, null, null, function (v1, v2) {
 	    return v1.norm - v2.norm;
 	  });
 	  var w = [];
 	  for (var j = 0; j < E + 1; ++j) {
 	    w.push(values[j]);
 	  }
+	  (0, _quickselect2.default)(w, 1, null, null, function (v1, v2) {
+	    return v1.norm - v2.norm;
+	  });
 	  var sumw = 0;
 	  w.forEach(function (_, j) {
 	    w[j].weight = Math.exp(-w[j].norm / w[0].norm);
@@ -110,14 +130,19 @@
 	    }
 	    XE.push(x);
 	  }
+	  var m = XE.length;
+	  var matrix = normMatrix(E, XE);
 	  var rho = [];
-	  var Yexact = Y.slice(n - XE.length);
+	  var Yexact = Y.slice(n - m);
 
 	  var _loop = function _loop(l) {
-	    var library = XE.slice(0, l);
+	    var library = new Array(l);
+	    for (var _i2 = 0; _i2 < l; ++_i2) {
+	      library[_i2] = Math.floor(Math.random() * m);
+	    }
 	    var Yest = [];
 	    XE.forEach(function (x, i) {
-	      var w = weight(E, x, i, library);
+	      var w = weight(E, x, i, library, matrix);
 	      var Yesti = 0;
 	      var _iteratorNormalCompletion = true;
 	      var _didIteratorError = false;
@@ -148,10 +173,10 @@
 
 	      Yest.push(Yesti);
 	    });
-	    rho.push([l, correl(XE.length, Yexact, Yest)]);
+	    rho.push([l, correl(m, Yexact, Yest)]);
 	  };
 
-	  for (var l = lMin; l < XE.length; l += step) {
+	  for (var l = lMin; l < m; l += step) {
 	    _loop(l);
 	  }
 	  return rho;
@@ -165,10 +190,82 @@
 	  var E = _event$data.E;
 	  var tau = _event$data.tau;
 	  var lMin = _event$data.lMin;
-	  var step = _event$data.step;
+	  var lStep = _event$data.lStep;
 
-	  postMessage(ccm(n, X, Y, E, tau, lMin, step));
+	  var timeId = 'ccm' + Math.random();
+	  console.time(timeId);
+	  var result = ccm(n, X, Y, E, tau, lMin, lStep);
+	  console.timeEnd(timeId);
+	  postMessage(result);
 	};
 
+/***/ },
+
+/***/ 174:
+/***/ function(module, exports) {
+
+	'use strict';
+
+	module.exports = partialSort;
+
+	// Floyd-Rivest selection algorithm:
+	// Rearrange items so that all items in the [left, k] range are smaller than all items in (k, right];
+	// The k-th element will have the (k - left + 1)th smallest value in [left, right]
+
+	function partialSort(arr, k, left, right, compare) {
+	    left = left || 0;
+	    right = right || (arr.length - 1);
+	    compare = compare || defaultCompare;
+
+	    while (right > left) {
+	        if (right - left > 600) {
+	            var n = right - left + 1;
+	            var m = k - left + 1;
+	            var z = Math.log(n);
+	            var s = 0.5 * Math.exp(2 * z / 3);
+	            var sd = 0.5 * Math.sqrt(z * s * (n - s) / n) * (m - n / 2 < 0 ? -1 : 1);
+	            var newLeft = Math.max(left, Math.floor(k - m * s / n + sd));
+	            var newRight = Math.min(right, Math.floor(k + (n - m) * s / n + sd));
+	            partialSort(arr, k, newLeft, newRight, compare);
+	        }
+
+	        var t = arr[k];
+	        var i = left;
+	        var j = right;
+
+	        swap(arr, left, k);
+	        if (compare(arr[right], t) > 0) swap(arr, left, right);
+
+	        while (i < j) {
+	            swap(arr, i, j);
+	            i++;
+	            j--;
+	            while (compare(arr[i], t) < 0) i++;
+	            while (compare(arr[j], t) > 0) j--;
+	        }
+
+	        if (compare(arr[left], t) === 0) swap(arr, left, j);
+	        else {
+	            j++;
+	            swap(arr, j, right);
+	        }
+
+	        if (j <= k) left = j + 1;
+	        if (k <= j) right = j - 1;
+	    }
+	}
+
+	function swap(arr, i, j) {
+	    var tmp = arr[i];
+	    arr[i] = arr[j];
+	    arr[j] = tmp;
+	}
+
+	function defaultCompare(a, b) {
+	    return a < b ? -1 : a > b ? 1 : 0;
+	}
+
+
 /***/ }
-/******/ ]);
+
+/******/ });

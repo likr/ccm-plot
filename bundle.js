@@ -62,6 +62,10 @@
 
 	var _reactDom = __webpack_require__(40);
 
+	var _querystring = __webpack_require__(170);
+
+	var _querystring2 = _interopRequireDefault(_querystring);
+
 	function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -70,7 +74,7 @@
 
 	function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
-	var OrbitControls = __webpack_require__(170)(_three2.default);
+	var OrbitControls = __webpack_require__(173)(_three2.default);
 	var screenSize = 600;
 
 	var Screen = function (_React$Component) {
@@ -170,12 +174,12 @@
 	    value: function componentDidMount() {
 	      var _this3 = this;
 
-	      var lMin = 100;
-	      var step = 100;
 	      var _props2 = this.props;
 	      var data = _props2.data;
 	      var E = _props2.E;
 	      var tau = _props2.tau;
+	      var lMin = _props2.lMin;
+	      var lStep = _props2.lStep;
 
 	      var xWorker = new window.Worker('worker.js');
 	      xWorker.onmessage = function (event) {
@@ -194,7 +198,7 @@
 	        E: E,
 	        tau: tau,
 	        lMin: lMin,
-	        step: step
+	        lStep: lStep
 	      });
 	      var yWorker = new window.Worker('worker.js');
 	      yWorker.onmessage = function (event) {
@@ -213,7 +217,7 @@
 	        E: E,
 	        tau: tau,
 	        lMin: lMin,
-	        step: step
+	        lStep: lStep
 	      });
 	    }
 	  }, {
@@ -225,9 +229,11 @@
 	      var rhoY = _state.rhoY;
 
 	      var svgSize = 500;
-	      var xScale = _d2.default.scale.linear().domain([0, _d2.default.max(rhoX, function (d) {
+	      var xScale = _d2.default.scale.linear().domain([0, Math.max(_d2.default.max(rhoX, function (d) {
 	        return d[0];
-	      })]).range([0, svgSize]);
+	      }) || 0, _d2.default.max(rhoY, function (d) {
+	        return d[0];
+	      }) || 0)]).range([0, svgSize]);
 	      var yScale = _d2.default.scale.linear().domain([-1, 1]).range([svgSize, 0]);
 	      var line = _d2.default.svg.line().x(function (d) {
 	        return xScale(d[0]);
@@ -325,7 +331,10 @@
 	  _createClass(App, [{
 	    key: 'render',
 	    value: function render() {
-	      var data = this.props.data;
+	      var _props3 = this.props;
+	      var data = _props3.data;
+	      var lMin = _props3.lMin;
+	      var lStep = _props3.lStep;
 
 	      var camera = new _three2.default.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 0.1, 1000);
 	      return _react2.default.createElement(
@@ -359,8 +368,8 @@
 	            _react2.default.createElement(
 	              'div',
 	              null,
-	              _react2.default.createElement(Chart, { E: 2, tau: 1, data: data }),
-	              _react2.default.createElement(Chart, { E: 2, tau: 2, data: data })
+	              _react2.default.createElement(Chart, { E: 2, tau: 1, data: data, lMin: lMin, lStep: lStep }),
+	              _react2.default.createElement(Chart, { E: 2, tau: 2, data: data, lMin: lMin, lStep: lStep })
 	            )
 	          ),
 	          _react2.default.createElement(
@@ -378,8 +387,8 @@
 	            _react2.default.createElement(
 	              'div',
 	              null,
-	              _react2.default.createElement(Chart, { E: 3, tau: 1, data: data }),
-	              _react2.default.createElement(Chart, { E: 3, tau: 2, data: data })
+	              _react2.default.createElement(Chart, { E: 3, tau: 1, data: data, lMin: lMin, lStep: lStep }),
+	              _react2.default.createElement(Chart, { E: 3, tau: 2, data: data, lMin: lMin, lStep: lStep })
 	            )
 	          )
 	        ),
@@ -432,9 +441,23 @@
 	  return App;
 	}(_react2.default.Component);
 
-	_d2.default.csv('data.csv', function (data) {
-	  (0, _reactDom.render)(_react2.default.createElement(App, { data: data }), document.getElementById('content'));
-	});
+	{
+	  (function () {
+	    var options = _querystring2.default.parse(window.location.search.substr(1));
+	    var file = options.file || 'data/two_species_model.csv';
+	    var lMin = +options.lmin || 100;
+	    var lStep = +options.lstep || 100;
+	    var xAxis = options.xaxis || 'X';
+	    var yAxis = options.yaxis || 'Y';
+
+	    _d2.default.csv(file, function (baseData) {
+	      var data = baseData.map(function (d) {
+	        return { X: d[xAxis], Y: d[yAxis] };
+	      });
+	      (0, _reactDom.render)(_react2.default.createElement(App, { data: data, lMin: lMin, lStep: lStep }), document.getElementById('content'));
+	    });
+	  })();
+	}
 
 /***/ },
 /* 1 */
@@ -72015,6 +72038,172 @@
 
 /***/ },
 /* 170 */
+/***/ function(module, exports, __webpack_require__) {
+
+	'use strict';
+
+	exports.decode = exports.parse = __webpack_require__(171);
+	exports.encode = exports.stringify = __webpack_require__(172);
+
+
+/***/ },
+/* 171 */
+/***/ function(module, exports) {
+
+	// Copyright Joyent, Inc. and other Node contributors.
+	//
+	// Permission is hereby granted, free of charge, to any person obtaining a
+	// copy of this software and associated documentation files (the
+	// "Software"), to deal in the Software without restriction, including
+	// without limitation the rights to use, copy, modify, merge, publish,
+	// distribute, sublicense, and/or sell copies of the Software, and to permit
+	// persons to whom the Software is furnished to do so, subject to the
+	// following conditions:
+	//
+	// The above copyright notice and this permission notice shall be included
+	// in all copies or substantial portions of the Software.
+	//
+	// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+	// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+	// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+	// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+	// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+	// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+	// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+	'use strict';
+
+	// If obj.hasOwnProperty has been overridden, then calling
+	// obj.hasOwnProperty(prop) will break.
+	// See: https://github.com/joyent/node/issues/1707
+	function hasOwnProperty(obj, prop) {
+	  return Object.prototype.hasOwnProperty.call(obj, prop);
+	}
+
+	module.exports = function(qs, sep, eq, options) {
+	  sep = sep || '&';
+	  eq = eq || '=';
+	  var obj = {};
+
+	  if (typeof qs !== 'string' || qs.length === 0) {
+	    return obj;
+	  }
+
+	  var regexp = /\+/g;
+	  qs = qs.split(sep);
+
+	  var maxKeys = 1000;
+	  if (options && typeof options.maxKeys === 'number') {
+	    maxKeys = options.maxKeys;
+	  }
+
+	  var len = qs.length;
+	  // maxKeys <= 0 means that we should not limit keys count
+	  if (maxKeys > 0 && len > maxKeys) {
+	    len = maxKeys;
+	  }
+
+	  for (var i = 0; i < len; ++i) {
+	    var x = qs[i].replace(regexp, '%20'),
+	        idx = x.indexOf(eq),
+	        kstr, vstr, k, v;
+
+	    if (idx >= 0) {
+	      kstr = x.substr(0, idx);
+	      vstr = x.substr(idx + 1);
+	    } else {
+	      kstr = x;
+	      vstr = '';
+	    }
+
+	    k = decodeURIComponent(kstr);
+	    v = decodeURIComponent(vstr);
+
+	    if (!hasOwnProperty(obj, k)) {
+	      obj[k] = v;
+	    } else if (Array.isArray(obj[k])) {
+	      obj[k].push(v);
+	    } else {
+	      obj[k] = [obj[k], v];
+	    }
+	  }
+
+	  return obj;
+	};
+
+
+/***/ },
+/* 172 */
+/***/ function(module, exports) {
+
+	// Copyright Joyent, Inc. and other Node contributors.
+	//
+	// Permission is hereby granted, free of charge, to any person obtaining a
+	// copy of this software and associated documentation files (the
+	// "Software"), to deal in the Software without restriction, including
+	// without limitation the rights to use, copy, modify, merge, publish,
+	// distribute, sublicense, and/or sell copies of the Software, and to permit
+	// persons to whom the Software is furnished to do so, subject to the
+	// following conditions:
+	//
+	// The above copyright notice and this permission notice shall be included
+	// in all copies or substantial portions of the Software.
+	//
+	// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+	// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+	// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+	// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+	// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+	// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+	// USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+	'use strict';
+
+	var stringifyPrimitive = function(v) {
+	  switch (typeof v) {
+	    case 'string':
+	      return v;
+
+	    case 'boolean':
+	      return v ? 'true' : 'false';
+
+	    case 'number':
+	      return isFinite(v) ? v : '';
+
+	    default:
+	      return '';
+	  }
+	};
+
+	module.exports = function(obj, sep, eq, name) {
+	  sep = sep || '&';
+	  eq = eq || '=';
+	  if (obj === null) {
+	    obj = undefined;
+	  }
+
+	  if (typeof obj === 'object') {
+	    return Object.keys(obj).map(function(k) {
+	      var ks = encodeURIComponent(stringifyPrimitive(k)) + eq;
+	      if (Array.isArray(obj[k])) {
+	        return obj[k].map(function(v) {
+	          return ks + encodeURIComponent(stringifyPrimitive(v));
+	        }).join(sep);
+	      } else {
+	        return ks + encodeURIComponent(stringifyPrimitive(obj[k]));
+	      }
+	    }).join(sep);
+
+	  }
+
+	  if (!name) return '';
+	  return encodeURIComponent(stringifyPrimitive(name)) + eq +
+	         encodeURIComponent(stringifyPrimitive(obj));
+	};
+
+
+/***/ },
+/* 173 */
 /***/ function(module, exports) {
 
 	module.exports = function(THREE) {
